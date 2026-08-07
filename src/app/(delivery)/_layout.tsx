@@ -1,0 +1,10 @@
+import { Stack } from 'expo-router';
+
+export default function DeliveryLayout() {
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="active-delivery/[id]" options={{ headerShown: true, title: 'Active Delivery' }} />
+    </Stack>
+  );
+}
