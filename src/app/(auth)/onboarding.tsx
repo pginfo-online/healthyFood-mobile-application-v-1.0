@@ -12,6 +12,7 @@ import Animated, {
   FadeIn, SlideInDown,
 } from 'react-native-reanimated';
 import { Colors, Spacing, BorderRadius, Typography } from '../../constants/theme';
+import { useAuthStore } from '../../store/auth.store';
 
 const { width, height } = Dimensions.get('window');
 
@@ -23,6 +24,7 @@ const features = [
 ];
 
 export default function OnboardingScreen() {
+  const setOnboarded = useAuthStore((s) => s.setOnboarded);
   const opacity = useSharedValue(0);
   const translateY = useSharedValue(30);
 
@@ -80,7 +82,10 @@ export default function OnboardingScreen() {
           <TouchableOpacity
             id="onboarding-get-started"
             style={styles.primaryBtn}
-            onPress={() => router.push('/(auth)/register')}
+            onPress={() => {
+              setOnboarded();
+              router.push('/(auth)/register');
+            }}
             activeOpacity={0.85}
           >
             <Text style={styles.primaryBtnText}>Get Started 🚀</Text>
@@ -89,7 +94,10 @@ export default function OnboardingScreen() {
           <TouchableOpacity
             id="onboarding-login"
             style={styles.secondaryBtn}
-            onPress={() => router.push('/(auth)/login')}
+            onPress={() => {
+              setOnboarded();
+              router.push('/(auth)/login');
+            }}
             activeOpacity={0.7}
           >
             <Text style={styles.secondaryBtnText}>Already have an account? Sign in</Text>

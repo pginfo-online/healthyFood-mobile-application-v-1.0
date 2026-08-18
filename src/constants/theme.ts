@@ -1,3 +1,13 @@
+import { Platform } from 'react-native';
+
+export const Fonts = {
+  mono: Platform.select({
+    ios: 'Menlo',
+    android: 'monospace',
+    default: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace',
+  }),
+};
+
 export const Colors = {
   brand: {
     50: '#f0fdf4',

@@ -33,8 +33,11 @@ export default function RootLayout() {
     SplashScreen.hideAsync().catch(() => {});
 
     if (!hasOnboarded) {
-      // Redirect to onboarding if not done
-      if (segments[0] !== '(auth)' || segments[1] !== 'onboarding') {
+      // Redirect to onboarding if not done, but allow login and register
+      if (
+        segments[0] !== '(auth)' ||
+        (segments[1] !== 'onboarding' && segments[1] !== 'login' && segments[1] !== 'register')
+      ) {
         router.replace('/(auth)/onboarding');
       }
     } else if (!isAuthenticated) {

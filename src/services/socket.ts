@@ -1,6 +1,23 @@
 import { io, Socket } from 'socket.io-client';
+import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-const SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+const getHostIp = () => {
+  if (__DEV__) {
+    const hostUri = Constants.expoConfig?.hostUri || Constants.manifest2?.extra?.expoGo?.debuggerHost;
+    if (hostUri) {
+      const ip = hostUri.split(':')[0];
+      if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
+        return ip;
+      }
+    }
+  }
+  return Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+};
+
+const hostIp = getHostIp();
+let SOCKET_URL = process.env.EXPO_PUBLIC_SOCKET_URL || 'http://localhost:3001';
+SOCKET_URL = SOCKET_URL.replace('localhost', hostIp).replace('127.0.0.1', hostIp);
 
 class SocketService {
   private socket: Socket | null = null;
