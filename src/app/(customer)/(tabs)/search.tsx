@@ -1,67 +1,51 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TextInput, ScrollView,
-  TouchableOpacity, FlatList, Image, StatusBar,
+  TouchableOpacity, FlatList, Image, StatusBar, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, ArrowLeft, SlidersHorizontal, Star } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/theme';
 import { router } from 'expo-router';
+import api from '@/services/api';
 
 const dietaryFilters = [
   'vegan', 'gluten-free', 'keto-friendly', 'organic', 'high-protein', 'low-sugar',
 ];
 
-const mockProducts = [
-  {
-    id: 'p1',
-    name: 'Organic Avocados',
-    price: 180,
-    discountPrice: 150,
-    unit: '2 pcs',
-    rating: 4.8,
-    image: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=200&q=80',
-    tags: ['organic', 'keto-friendly'],
-    storeName: 'Pune Healthy Mart',
-  },
-  {
-    id: 'p2',
-    name: 'Almond Milk (Unsweetened)',
-    price: 250,
-    discountPrice: 220,
-    unit: '1L',
-    rating: 4.7,
-    image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&q=80',
-    tags: ['vegan', 'gluten-free'],
-    storeName: 'Organic World',
-  },
-  {
-    id: 'p3',
-    name: 'Organic Quinoa Grains',
-    price: 350,
-    discountPrice: 300,
-    unit: '500g',
-    rating: 4.9,
-    image: 'https://images.unsplash.com/photo-1586201375761-83865001e31c?w=200&q=80',
-    tags: ['organic', 'gluten-free', 'high-protein'],
-    storeName: 'Fresh Basket',
-  },
-];
-
 export default function SearchScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string> = {};
+      if (searchQuery.trim()) params.search = searchQuery.trim();
+      if (selectedTag) params.dietaryTags = selectedTag;
+
+      const res = await api.get('/products', { params });
+      const data = res.data?.data ?? res.data ?? [];
+      setProducts(Array.isArray(data) ? data : []);
+    } catch (e) {
+      console.error('Failed to search products:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchProducts();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, selectedTag]);
 
   const toggleTag = (tag: string) => {
     setSelectedTag(selectedTag === tag ? null : tag);
   };
-
-  const filteredProducts = mockProducts.filter((product) => {
-    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          product.storeName.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesTag = !selectedTag || product.tags.includes(selectedTag);
-    return matchesSearch && matchesTag;
-  });
 
   return (
     <SafeAreaView style={styles.container}>
@@ -113,53 +97,74 @@ export default function SearchScreen() {
       </View>
 
       {/* Results List */}
-      <FlatList
-        data={filteredProducts}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No healthy products match your search.</Text>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            id={`product-result-${item.id}`}
-            style={styles.productCard}
-            activeOpacity={0.9}
-            onPress={() => router.push({ pathname: `/(customer)/product/[id]`, params: { id: item.id } })}
-          >
-            <Image source={{ uri: item.image }} style={styles.productImage} />
-            <View style={styles.productInfo}>
-              <Text style={styles.productStore}>{item.storeName}</Text>
-              <Text style={styles.productName}>{item.name}</Text>
-              <Text style={styles.productUnit}>{item.unit}</Text>
-
-              {/* Tags */}
-              <View style={styles.tagsContainer}>
-                {item.tags.map((tag) => (
-                  <View key={tag} style={styles.tagBadge}>
-                    <Text style={styles.tagText}>{tag}</Text>
-                  </View>
-                ))}
-              </View>
-
-              <View style={styles.productFooter}>
-                <View style={styles.priceRow}>
-                  <Text style={styles.discountPrice}>₹{item.discountPrice}</Text>
-                  <Text style={styles.originalPrice}>₹{item.price}</Text>
-                </View>
-
-                <View style={styles.ratingBg}>
-                  <Star color={Colors.yellow[600]} size={12} fill={Colors.yellow[600]} />
-                  <Text style={styles.ratingText}>{item.rating}</Text>
-                </View>
-              </View>
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={Colors.brand[600]} />
+        </View>
+      ) : (
+        <FlatList
+          data={products}
+          keyExtractor={(item) => item._id || item.id}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={{ padding: Spacing[8], alignItems: 'center' }}>
+              <Text style={{ fontSize: 36, marginBottom: 8 }}>🔍</Text>
+              <Text style={{ fontSize: Typography.fontSize.sm, color: Colors.neutral[600], fontWeight: '600' }}>
+                No products found
+              </Text>
+              <Text style={{ fontSize: Typography.fontSize.xs, color: Colors.neutral[400], marginTop: 2 }}>
+                Try searching for different keywords or clearing filters
+              </Text>
             </View>
-          </TouchableOpacity>
-        )}
-      />
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              id={`product-result-${item._id || item.id}`}
+              style={styles.productCard}
+              activeOpacity={0.9}
+              onPress={() => router.push({ pathname: `/(customer)/product/[id]` as any, params: { id: item._id || item.id } })}
+            >
+              <Image
+                source={{ uri: item.images?.[0] || item.image || 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=200&q=80' }}
+                style={styles.productImage}
+              />
+              <View style={styles.productInfo}>
+                <Text style={styles.productStore}>{item.storeId?.name || item.storeName || 'HealthyFood'}</Text>
+                <Text style={styles.productName}>{item.name}</Text>
+                <Text style={styles.productUnit}>{item.unit}</Text>
+
+                {/* Tags */}
+                <View style={styles.tagsContainer}>
+                  {(item.dietaryTags || item.tags || []).map((tag: string) => (
+                    <View key={tag} style={styles.tagBadge}>
+                      <Text style={styles.tagText}>{tag}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <View style={styles.productFooter}>
+                  <View style={styles.priceRow}>
+                    {item.discountPrice ? (
+                      <>
+                        <Text style={styles.discountPrice}>₹{item.discountPrice}</Text>
+                        <Text style={styles.originalPrice}>₹{item.price}</Text>
+                      </>
+                    ) : (
+                      <Text style={styles.discountPrice}>₹{item.price}</Text>
+                    )}
+                  </View>
+
+                  <View style={styles.ratingBg}>
+                    <Star color={Colors.yellow[600]} size={12} fill={Colors.yellow[600]} />
+                    <Text style={styles.ratingText}>{item.averageRating || item.rating || '4.8'}</Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 }

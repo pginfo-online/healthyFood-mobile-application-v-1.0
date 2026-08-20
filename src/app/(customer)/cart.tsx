@@ -4,53 +4,17 @@ import {
   Image, TextInput, StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Plus, Minus, Tag, Trash2, ArrowRight } from 'lucide-react-native';
+import { Plus, Minus, Tag, Trash2, ArrowRight, ShoppingBag } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/theme';
 import { router } from 'expo-router';
-
-const mockCartItems = [
-  {
-    id: 'p1',
-    name: 'Organic Avocados',
-    price: 180,
-    discountPrice: 150,
-    unit: '2 pcs',
-    image: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=200&q=80',
-    quantity: 1,
-  },
-  {
-    id: 'p4',
-    name: 'Organic Baby Spinach',
-    price: 60,
-    discountPrice: 45,
-    unit: '200g',
-    image: 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=200&q=80',
-    quantity: 2,
-  },
-];
+import { useCartStore } from '@/store/cart.store';
 
 export default function CartScreen() {
-  const [items, setItems] = useState(mockCartItems);
+  const { items, updateQuantity, removeItem, clearCart, getTotal } = useCartStore();
   const [coupon, setCoupon] = useState('');
   const [appliedDiscount, setAppliedDiscount] = useState(0);
 
-  const updateQty = (id: string, delta: number) => {
-    setItems(prev =>
-      prev.map(item => {
-        if (item.id === id) {
-          const qty = Math.max(1, item.quantity + delta);
-          return { ...item, quantity: qty };
-        }
-        return item;
-      })
-    );
-  };
-
-  const removeItem = (id: string) => {
-    setItems(prev => prev.filter(item => item.id !== id));
-  };
-
-  const subtotal = items.reduce((sum, item) => sum + item.discountPrice * item.quantity, 0);
+  const subtotal = getTotal();
   const deliveryCharge = subtotal > 300 || subtotal === 0 ? 0 : 35;
   const tax = Math.round(subtotal * 0.05); // 5% GST
   const total = Math.max(0, subtotal + deliveryCharge + tax - appliedDiscount);
@@ -58,6 +22,8 @@ export default function CartScreen() {
   const applyPromo = () => {
     if (coupon.toUpperCase() === 'HEALTHY100') {
       setAppliedDiscount(100);
+    } else if (coupon.toUpperCase() === 'HEALTHY20') {
+      setAppliedDiscount(Math.round(subtotal * 0.2));
     }
   };
 
@@ -70,7 +36,7 @@ export default function CartScreen() {
           <Text style={styles.emptyText}>Your cart is empty 🥗</Text>
           <TouchableOpacity 
             style={styles.emptyBtn} 
-            onPress={() => router.push('/(customer)/(tabs)')}
+            onPress={() => router.push('/(customer)/(tabs)' as any)}
             activeOpacity={0.8}
           >
             <Text style={styles.emptyBtnText}>Browse Stores</Text>
@@ -82,25 +48,28 @@ export default function CartScreen() {
             {/* Items List */}
             <View style={styles.itemsCard}>
               {items.map((item) => (
-                <View key={item.id} style={styles.cartItem}>
-                  <Image source={{ uri: item.image }} style={styles.itemImage} />
+                <View key={item.productId} style={styles.cartItem}>
+                  <Image
+                    source={{ uri: item.image || 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=200&q=80' }}
+                    style={styles.itemImage}
+                  />
                   <View style={styles.itemDetails}>
                     <Text style={styles.itemName}>{item.name}</Text>
                     <Text style={styles.itemUnit}>{item.unit}</Text>
-                    <Text style={styles.itemPrice}>₹{item.discountPrice}</Text>
+                    <Text style={styles.itemPrice}>₹{item.discountPrice ?? item.price}</Text>
                   </View>
 
                   <View style={styles.actionsContainer}>
-                    <TouchableOpacity onPress={() => removeItem(item.id)} style={styles.trashBtn} activeOpacity={0.7}>
+                    <TouchableOpacity onPress={() => removeItem(item.productId)} style={styles.trashBtn} activeOpacity={0.7}>
                       <Trash2 color={Colors.neutral[400]} size={16} />
                     </TouchableOpacity>
 
                     <View style={styles.qtyContainer}>
-                      <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(item.id, -1)} activeOpacity={0.7}>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item.productId, item.quantity - 1)} activeOpacity={0.7}>
                         <Minus color={Colors.neutral[800]} size={14} />
                       </TouchableOpacity>
                       <Text style={styles.qtyText}>{item.quantity}</Text>
-                      <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQty(item.id, 1)} activeOpacity={0.7}>
+                      <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item.productId, item.quantity + 1)} activeOpacity={0.7}>
                         <Plus color={Colors.neutral[800]} size={14} />
                       </TouchableOpacity>
                     </View>

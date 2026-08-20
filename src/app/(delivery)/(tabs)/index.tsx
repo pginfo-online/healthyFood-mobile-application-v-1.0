@@ -1,27 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Switch,
-  TouchableOpacity, StatusBar,
+  TouchableOpacity, StatusBar, ActivityIndicator, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MapPin, ArrowRight } from 'lucide-react-native';
+import { MapPin, ArrowRight, LogOut } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/theme';
 import { router } from 'expo-router';
-
-const mockRequests = [
-  {
-    id: 'ord1',
-    orderId: 'HF-20260807-000123',
-    storeName: 'Pune Healthy Mart',
-    storeAddress: 'Kalyani Nagar, Pune',
-    customerAddress: 'Marvel Crest, Kalyani Nagar, Pune',
-    payout: 65,
-    distance: '2.4 km total',
-  },
-];
+import api from '@/services/api';
+import { useAuthStore } from '@/store/auth.store';
 
 export default function DeliveryDashboard() {
+  const { logout } = useAuthStore();
   const [isOnline, setIsOnline] = useState(true);
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Log Out',
+      'Are you sure you want to log out from delivery partner app?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: () => {
+            logout();
+            router.replace('/(auth)/login' as any);
+          },
+        },
+      ]
+    );
+  };
+  const [earnings, setEarnings] = useState<{ totalEarnings: number; totalDeliveries: number }>({
+    totalEarnings: 0,
+    totalDeliveries: 0,
+  });
+  const [activeAssignment, setActiveAssignment] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDeliveryData = async () => {
+    try {
+      const [earnRes, assignRes] = await Promise.all([
+        api.get('/delivery/earnings', { params: { period: 'today' } }).catch(() => ({ data: { totalEarnings: 0, totalDeliveries: 0 } })),
+        api.get('/delivery/my-assignment').catch(() => ({ data: null })),
+      ]);
+      setEarnings(earnRes.data || { totalEarnings: 0, totalDeliveries: 0 });
+      setActiveAssignment(assignRes.data);
+    } catch (e) {
+      console.error('Failed to fetch delivery data:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDeliveryData();
+  }, []);
+
+  const toggleOnline = async (val: boolean) => {
+    setIsOnline(val);
+    try {
+      await api.patch('/delivery/online-status', { isOnline: val });
+    } catch (e) {
+      console.error('Failed to update online status:', e);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -34,17 +77,26 @@ export default function DeliveryDashboard() {
           <Text style={styles.subtitle}>Manage your delivery requests</Text>
         </View>
 
-        <View style={styles.statusToggle}>
-          <Text style={[styles.statusText, isOnline ? styles.textOnline : styles.textOffline]}>
-            {isOnline ? 'ONLINE' : 'OFFLINE'}
-          </Text>
-          <Switch
-            id="delivery-online-switch"
-            value={isOnline}
-            onValueChange={setIsOnline}
-            trackColor={{ false: Colors.neutral[300], true: Colors.brand[200] }}
-            thumbColor={isOnline ? Colors.brand[600] : Colors.neutral[400]}
-          />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing[2] }}>
+          <View style={styles.statusToggle}>
+            <Text style={[styles.statusText, isOnline ? styles.textOnline : styles.textOffline]}>
+              {isOnline ? 'ONLINE' : 'OFFLINE'}
+            </Text>
+            <Switch
+              id="delivery-online-switch"
+              value={isOnline}
+              onValueChange={toggleOnline}
+              trackColor={{ false: Colors.neutral[300], true: Colors.brand[200] }}
+              thumbColor={isOnline ? Colors.brand[600] : Colors.neutral[400]}
+            />
+          </View>
+          <TouchableOpacity
+            style={{ padding: 6, borderRadius: 12, backgroundColor: Colors.red[50] }}
+            onPress={handleLogout}
+            title="Log Out"
+          >
+            <LogOut color={Colors.red[600]} size={18} />
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -52,8 +104,8 @@ export default function DeliveryDashboard() {
         {/* Earnings banner */}
         <View style={styles.earningsCard}>
           <Text style={styles.earningLabel}>TODAY&apos;S EARNINGS</Text>
-          <Text style={styles.earningVal}>₹260</Text>
-          <Text style={styles.earningSub}>4 deliveries completed</Text>
+          <Text style={styles.earningVal}>₹{earnings.totalEarnings}</Text>
+          <Text style={styles.earningSub}>{earnings.totalDeliveries} deliveries completed</Text>
         </View>
 
         <Text style={styles.sectionTitle}>Incoming Requests</Text>
@@ -64,7 +116,7 @@ export default function DeliveryDashboard() {
             <Text style={styles.placeholderTitle}>You are offline</Text>
             <Text style={styles.placeholderDesc}>Go online to start receiving delivery tasks.</Text>
           </View>
-        ) : mockRequests.length === 0 ? (
+        ) : !activeAssignment ? (
           <View style={styles.emptyPlaceholder}>
             <Text style={styles.placeholderEmoji}>⏳</Text>
             <Text style={styles.placeholderTitle}>Looking for requests...</Text>
@@ -72,48 +124,46 @@ export default function DeliveryDashboard() {
           </View>
         ) : (
           <View style={styles.requestsContainer}>
-            {mockRequests.map((req) => (
-              <View key={req.id} style={styles.requestCard}>
-                <View style={styles.reqHeader}>
-                  <View>
-                    <Text style={styles.reqId}>{req.orderId}</Text>
-                    <Text style={styles.reqDistance}>{req.distance}</Text>
-                  </View>
-                  <Text style={styles.reqPayout}>₹{req.payout}</Text>
+            <View key={activeAssignment._id} style={styles.requestCard}>
+              <View style={styles.reqHeader}>
+                <View>
+                  <Text style={styles.reqId}>{activeAssignment.orderId?.orderId ?? 'Active Order'}</Text>
+                  <Text style={styles.reqDistance}>{activeAssignment.distanceKm ? `${activeAssignment.distanceKm} km total` : 'Assigned'}</Text>
                 </View>
-
-                {/* Pickup details */}
-                <View style={styles.routeContainer}>
-                  <View style={styles.dotContainer}>
-                    <View style={[styles.dot, styles.dotGreen]} />
-                    <View style={styles.dashLine} />
-                    <View style={[styles.dot, styles.dotBlack]} />
-                  </View>
-                  
-                  <View style={styles.routeDetails}>
-                    <View>
-                      <Text style={styles.routeLabel}>PICKUP</Text>
-                      <Text style={styles.storeName}>{req.storeName}</Text>
-                      <Text style={styles.addressText}>{req.storeAddress}</Text>
-                    </View>
-                    <View style={{ marginTop: Spacing[4] }}>
-                      <Text style={styles.routeLabel}>DELIVER TO</Text>
-                      <Text style={styles.addressText}>{req.customerAddress}</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  id="accept-request-btn"
-                  style={styles.acceptBtn}
-                  activeOpacity={0.9}
-                  onPress={() => router.push({ pathname: '/(delivery)/active-delivery/[id]', params: { id: req.id } })}
-                >
-                  <Text style={styles.acceptText}>Accept Delivery</Text>
-                  <ArrowRight color={Colors.white} size={18} />
-                </TouchableOpacity>
+                <Text style={styles.reqPayout}>₹{activeAssignment.payout ?? 50}</Text>
               </View>
-            ))}
+
+              {/* Pickup details */}
+              <View style={styles.routeContainer}>
+                <View style={styles.dotContainer}>
+                  <View style={[styles.dot, styles.dotGreen]} />
+                  <View style={styles.dashLine} />
+                  <View style={[styles.dot, styles.dotBlack]} />
+                </View>
+                
+                <View style={styles.routeDetails}>
+                  <View>
+                    <Text style={styles.routeLabel}>PICKUP</Text>
+                    <Text style={styles.storeName}>{activeAssignment.storeId?.name ?? 'Store'}</Text>
+                    <Text style={styles.addressText}>{activeAssignment.storeId?.address ?? 'Store Location'}</Text>
+                  </View>
+                  <View style={{ marginTop: Spacing[4] }}>
+                    <Text style={styles.routeLabel}>DELIVER TO</Text>
+                    <Text style={styles.addressText}>{activeAssignment.orderId?.deliveryAddress?.address ?? 'Customer Address'}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                id="accept-request-btn"
+                style={styles.acceptBtn}
+                activeOpacity={0.9}
+                onPress={() => router.push({ pathname: '/(delivery)/active-delivery/[id]' as any, params: { id: activeAssignment._id } })}
+              >
+                <Text style={styles.acceptText}>View Active Delivery</Text>
+                <ArrowRight color={Colors.white} size={18} />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </ScrollView>

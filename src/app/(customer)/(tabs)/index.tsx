@@ -1,59 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput,
   TouchableOpacity, Image, FlatList, StatusBar,
-  Dimensions, ActivityIndicator,
+  Dimensions, ActivityIndicator, RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, MapPin, ChevronDown, Bell, Star } from 'lucide-react-native';
 import { Colors, Spacing, BorderRadius, Typography } from '@/constants/theme';
 import { router } from 'expo-router';
+import api from '@/services/api';
 
 const { width } = Dimensions.get('window');
 
-const categories = [
-  { id: '1', name: 'Fresh Fruits', emoji: '🍎' },
-  { id: '2', name: 'Vegetables', emoji: '🥦' },
-  { id: '3', name: 'Organic', emoji: '🌿' },
-  { id: '4', name: 'Protein', emoji: '💪' },
-  { id: '5', name: 'Low Sugar', emoji: '🍓' },
-];
-
-const mockStores = [
-  {
-    id: 'store_a',
-    name: 'Pune Healthy Mart',
-    logo: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&q=80',
-    tags: ['Organic', 'Keto', 'Vegan'],
-    rating: 4.8,
-    deliveryTime: '20-30 mins',
-    deliveryCharge: 30,
-    minOrder: 150,
-  },
-  {
-    id: 'store_b',
-    name: 'Fresh Basket',
-    logo: 'https://images.unsplash.com/photo-1608686207856-001b95cf60ca?w=200&q=80',
-    tags: ['Fruits', 'Vegetables', 'Salads'],
-    rating: 4.6,
-    deliveryTime: '15-25 mins',
-    deliveryCharge: 20,
-    minOrder: 100,
-  },
-  {
-    id: 'store_c',
-    name: 'Organic World',
-    logo: 'https://images.unsplash.com/photo-1506084868230-bb9d95c24759?w=200&q=80',
-    tags: ['Millets', 'Grains', 'Superfoods'],
-    rating: 4.9,
-    deliveryTime: '30-40 mins',
-    deliveryCharge: 40,
-    minOrder: 200,
-  },
-];
-
 export default function CustomerHomeScreen() {
   const [address, setAddress] = useState('Kalyani Nagar, Pune');
+  const [categories, setCategories] = useState<any[]>([]);
+  const [stores, setStores] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchData = async () => {
+    try {
+      const [catRes, storeRes] = await Promise.all([
+        api.get('/categories').catch(() => ({ data: [] })),
+        api.get('/stores').catch(() => ({ data: { data: [] } })),
+      ]);
+      const catData = catRes.data?.data ?? catRes.data ?? [];
+      const storeData = storeRes.data?.data ?? storeRes.data ?? [];
+      setCategories(Array.isArray(catData) ? catData : []);
+      setStores(Array.isArray(storeData) ? storeData : []);
+    } catch (e) {
+      console.error('Failed to fetch home screen data:', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchData();
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -127,45 +118,63 @@ export default function CustomerHomeScreen() {
           <Text style={styles.sectionTitle}>Nearby Healthy Stores</Text>
         </View>
 
-        <View style={styles.storesList}>
-          {mockStores.map((store) => (
-            <TouchableOpacity 
-              key={store.id} 
-              id={`store-card-${store.id}`}
-              style={styles.storeCard} 
-              activeOpacity={0.9}
-              onPress={() => router.push({ pathname: `/(customer)/store/[id]`, params: { id: store.id } })}
-            >
-              <Image source={{ uri: store.logo }} style={styles.storeLogo} />
-              
-              <View style={styles.storeDetails}>
-                <View style={styles.storeNameRow}>
-                  <Text style={styles.storeName}>{store.name}</Text>
-                  <View style={styles.ratingBg}>
-                    <Star color={Colors.yellow[600]} size={12} fill={Colors.yellow[600]} />
-                    <Text style={styles.ratingText}>{store.rating}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.tagsContainer}>
-                  {store.tags.map((tag) => (
-                    <View key={tag} style={styles.tagBadge}>
-                      <Text style={styles.tagText}>{tag}</Text>
+        {stores.length === 0 ? (
+          <View style={{ padding: Spacing[6], alignItems: 'center' }}>
+            <Text style={{ fontSize: 32, marginBottom: 8 }}>🏪</Text>
+            <Text style={{ fontSize: Typography.fontSize.sm, color: Colors.neutral[600], fontWeight: '600' }}>
+              No stores nearby
+            </Text>
+            <Text style={{ fontSize: Typography.fontSize.xs, color: Colors.neutral[400], marginTop: 2 }}>
+              Check back soon as new healthy stores get approved!
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.storesList}>
+            {stores.map((store) => {
+              const storeId = store._id ?? store.id;
+              return (
+                <TouchableOpacity 
+                  key={storeId} 
+                  id={`store-card-${storeId}`}
+                  style={styles.storeCard} 
+                  activeOpacity={0.9}
+                  onPress={() => router.push({ pathname: `/(customer)/store/[id]` as any, params: { id: storeId } })}
+                >
+                  <Image
+                    source={{ uri: store.logo || 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&q=80' }}
+                    style={styles.storeLogo}
+                  />
+                  
+                  <View style={styles.storeDetails}>
+                    <View style={styles.storeNameRow}>
+                      <Text style={styles.storeName}>{store.name}</Text>
+                      <View style={styles.ratingBg}>
+                        <Star color={Colors.yellow[600]} size={12} fill={Colors.yellow[600]} />
+                        <Text style={styles.ratingText}>{store.averageRating || '4.8'}</Text>
+                      </View>
                     </View>
-                  ))}
-                </View>
 
-                <View style={styles.storeFooter}>
-                  <Text style={styles.infoText}>🛵 {store.deliveryTime}</Text>
-                  <Text style={styles.infoDot}>•</Text>
-                  <Text style={styles.infoText}>Min. ₹{store.minOrder}</Text>
-                  <Text style={styles.infoDot}>•</Text>
-                  <Text style={styles.infoText}>Charge ₹{store.deliveryCharge}</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+                    <View style={styles.tagsContainer}>
+                      {(store.tags || ['Organic', 'Keto']).map((tag: string) => (
+                        <View key={tag} style={styles.tagBadge}>
+                          <Text style={styles.tagText}>{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    <View style={styles.storeFooter}>
+                      <Text style={styles.infoText}>🛵 {store.deliveryTime || '20-30 mins'}</Text>
+                      <Text style={styles.infoDot}>•</Text>
+                      <Text style={styles.infoText}>Min. ₹{store.minimumOrderValue || 150}</Text>
+                      <Text style={styles.infoDot}>•</Text>
+                      <Text style={styles.infoText}>Charge ₹{store.deliveryCharge || 30}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

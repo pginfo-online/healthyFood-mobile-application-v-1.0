@@ -3,7 +3,7 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-const DEV_HOST_IP = ' 192.168.1.9';
+const DEV_HOST_IP = '10.81.59.79';
 const API_PORT = '3001';
 
 const getHostIp = () => {
@@ -39,9 +39,9 @@ const getHostIp = () => {
 
 const hostIp = getHostIp();
 
-const API_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  `http://${hostIp}:${API_PORT}/api/v1`;
+const API_URL ='http://localhost:3001/api/v1';
+  // process.env.EXPO_PUBLIC_API_URL ||
+  // `http://${hostIp}:${API_PORT}/api/v1`;
 
 console.log('API URL:', API_URL);
 
