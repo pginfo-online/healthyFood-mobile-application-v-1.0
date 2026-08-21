@@ -38,10 +38,11 @@ export default function LoginScreen() {
       } else {
         router.replace('/(customer)');
       }
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
-        'Login failed. Please try again.';
+    } catch (err: any) {
+      console.error('Login error:', err);
+      const apiMsg = err.response?.data?.message;
+      const networkMsg = err.message ? `(${err.message})` : '';
+      const msg = apiMsg || (err.message ? `Connection error ${networkMsg}. Check if backend is reachable at ${api.defaults.baseURL}` : 'Login failed. Please try again.');
       setError('password', { message: msg });
     }
   };

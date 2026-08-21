@@ -3,45 +3,31 @@ import axios from 'axios';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
-const DEV_HOST_IP = '10.81.59.79';
+const DEV_HOST_IP = '10.81.59.7';
 const API_PORT = '3001';
 
 const getHostIp = () => {
-  // Development
   if (__DEV__) {
-    // Expo Go / Metro host
     const hostUri =
       Constants.expoConfig?.hostUri ||
-      Constants.manifest2?.extra?.expoGo?.debuggerHost;
+      (Constants.manifest2 as any)?.extra?.expoGo?.debuggerHost;
 
     if (hostUri) {
       const ip = hostUri.split(':')[0];
-
-      // Use the detected LAN IP if available
-      if (
-        ip &&
-        ip !== 'localhost' &&
-        ip !== '127.0.0.1'
-      ) {
+      if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
         return ip;
       }
     }
-
-    // Your computer's LAN IP
     return DEV_HOST_IP;
   }
 
-  // Production fallback
-  return Platform.OS === 'android'
-    ? '10.0.2.2'
-    : 'localhost';
+  return Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
 };
 
 const hostIp = getHostIp();
 
-const API_URL ='http://localhost:3001/api/v1';
-  // process.env.EXPO_PUBLIC_API_URL ||
-  // `http://${hostIp}:${API_PORT}/api/v1`;
+const API_URL =
+  process.env.EXPO_PUBLIC_API_URL || `http://${hostIp}:${API_PORT}/api/v1`;
 
 console.log('API URL:', API_URL);
 
